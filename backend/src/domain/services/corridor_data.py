@@ -21,7 +21,7 @@ CORRIDORS = {
                 "typical_days": 2,
                 "hops": [
                     {"entity": "Stripe", "type": "PSP", "description": "Payment processor — charges 0.25% platform fee"},
-                    {"entity": "Citi Correspondent Bank", "type": "intermediary", "description": "USD→EUR nostro/vostro — flat fee ~$15"},
+                    {"entity": "Citi Correspondent Bank", "type": "intermediary", "description": "USD->EUR nostro/vostro — flat fee ~$15"},
                     {"entity": "SEPA Network", "type": "network", "description": "European payment clearing rail"},
                     {"entity": "Receiving Bank", "type": "fx", "description": "Final FX conversion — applies spread on mid-market rate"},
                 ]
@@ -165,28 +165,38 @@ FX_RATES = {
 
 def get_mid_market_rate(currency_from: str, currency_to: str, date=None) -> float:
     """
-    Get mid-market FX rate for a currency pair.
-    MVP: Uses hardcoded rates. Production: Fetch from ECB/Fed API.
+    Get mid-market FX rate from hardcoded data (sync fallback).
+    For live rates, use get_live_mid_market_rate() in routes.
     """
     key = f"{currency_from}_{currency_to}"
     rate = FX_RATES.get(key)
     if rate:
         return rate
-    # Try reverse
     reverse_key = f"{currency_to}_{currency_from}"
     reverse_rate = FX_RATES.get(reverse_key)
     if reverse_rate:
         return 1.0 / reverse_rate
-    return 1.0  # Fallback (same currency)
+    return 1.0
+
+
+async def get_live_mid_market_rate(currency_from: str, currency_to: str, on_date=None) -> float:
+    """
+    Get mid-market FX rate from live Frankfurter API (ECB data).
+    Falls back to hardcoded if API is unavailable.
+    """
+    from ...infrastructure.fx_rates import fetch_live_rate
+
+    live_rate = await fetch_live_rate(currency_from, currency_to, on_date)
+    if live_rate is not None:
+        return live_rate
+    return get_mid_market_rate(currency_from, currency_to, on_date)
 
 
 def get_corridor_info(corridor_code: str) -> dict:
-    """Get full corridor info or empty dict if unsupported."""
     return CORRIDORS.get(corridor_code, {})
 
 
 def get_supported_corridors() -> list:
-    """List all supported corridors."""
     return [
         {
             "code": code,

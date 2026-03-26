@@ -1,8 +1,9 @@
 """
 Pydantic schemas — API request/response models.
+Kept in the API layer because they define the HTTP contract.
 """
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, List, Any
+from typing import Optional, List
 from datetime import datetime
 
 
@@ -32,7 +33,6 @@ class UserResponse(BaseModel):
     email: str
     name: Optional[str] = None
     company: Optional[str] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -63,7 +63,6 @@ class PaymentResponse(BaseModel):
     psp: str
     status: str
     created_at: datetime
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -86,7 +85,6 @@ class AnalysisResponse(BaseModel):
     explanation: Optional[str] = None
     analyzed_at: datetime
     analysis_duration_ms: Optional[int] = None
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -127,7 +125,6 @@ class RecommendationResponse(BaseModel):
     implementation_steps: list
     status: str
     created_at: datetime
-
     model_config = ConfigDict(from_attributes=True)
 
 

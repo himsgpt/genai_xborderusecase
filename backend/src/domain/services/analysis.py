@@ -13,7 +13,7 @@ import time
 from typing import Optional
 from datetime import datetime
 
-from .corridor_data import CORRIDORS, get_mid_market_rate
+from .corridor_data import CORRIDORS, get_mid_market_rate  # sibling import within domain.services
 
 
 def analyze_payment(
@@ -25,10 +25,18 @@ def analyze_payment(
     initiated_at: datetime,
     settled_at: Optional[datetime],
     psp: str = "stripe",
+    live_mid_rate: Optional[float] = None,
+    stripe_fee_details: Optional[list] = None,
+    stripe_exchange_rate: Optional[float] = None,
 ) -> dict:
     """
     Analyze a single cross-border payment.
     Returns fee breakdown, flow reconstruction, leakage, and recommendations.
+
+    Enhanced mode (with Stripe data):
+      - live_mid_rate:         ECB mid-market rate from Frankfurter API
+      - stripe_fee_details:    Real fee breakdown from Stripe Balance Transaction
+      - stripe_exchange_rate:  Actual FX rate Stripe applied
     """
     start = time.time()
 
@@ -37,7 +45,7 @@ def analyze_payment(
         return {"error": f"Unsupported corridor: {corridor}"}
 
     # ── Step 1: Fee Attribution ──────────────────────────────────────────
-    mid_rate = get_mid_market_rate(currency_sent, currency_received, initiated_at)
+    mid_rate = live_mid_rate or get_mid_market_rate(currency_sent, currency_received, initiated_at)
     expected_amount = amount_sent * mid_rate
     actual_rate = amount_received / amount_sent if amount_sent else 0
 
@@ -46,21 +54,35 @@ def analyze_payment(
     total_fees = total_cost_received / mid_rate if mid_rate else 0
     total_cost_pct = (total_fees / amount_sent * 100) if amount_sent else 0
 
-    # Attribution: known platform fee, estimated intermediary, remainder = FX spread
-    platform_fee = amount_sent * corridor_info["typical_platform_fee_pct"]
-    intermediary_fee = corridor_info["typical_intermediary_fee"]
+    # --- REAL Stripe fee data (when available) ---
+    if stripe_fee_details:
+        platform_fee = sum(
+            fd["amount"] for fd in stripe_fee_details
+            if fd.get("type") in ("stripe_fee", "application_fee", "payment_method_passthrough_fee")
+        )
+        # FX spread = difference between mid-market and Stripe's exchange rate
+        if stripe_exchange_rate and mid_rate:
+            fx_spread_pct_val = abs(mid_rate - stripe_exchange_rate) / mid_rate
+            fx_spread_cost = amount_sent * fx_spread_pct_val
+        else:
+            fx_spread_cost = max(0, total_fees - platform_fee)
+        intermediary_fee = max(0, total_fees - platform_fee - fx_spread_cost)
+        data_source = "stripe_live"
+        confidence = 0.95
+    else:
+        # --- Heuristic attribution (no Stripe data) ---
+        platform_fee = amount_sent * corridor_info["typical_platform_fee_pct"]
+        intermediary_fee = corridor_info["typical_intermediary_fee"]
+        fx_spread_cost = max(0, total_fees - platform_fee - intermediary_fee)
 
-    # FX spread = everything not attributed to platform or intermediary
-    fx_spread_cost = max(0, total_fees - platform_fee - intermediary_fee)
-
-    # If total_fees is less than platform + intermediary (cheap payment), adjust
-    if total_fees < (platform_fee + intermediary_fee):
-        # Proportionally scale down
-        if platform_fee + intermediary_fee > 0:
-            ratio = total_fees / (platform_fee + intermediary_fee)
-            platform_fee *= ratio
-            intermediary_fee *= ratio
-        fx_spread_cost = 0
+        if total_fees < (platform_fee + intermediary_fee):
+            if platform_fee + intermediary_fee > 0:
+                ratio = total_fees / (platform_fee + intermediary_fee)
+                platform_fee *= ratio
+                intermediary_fee *= ratio
+            fx_spread_cost = 0
+        data_source = "heuristic"
+        confidence = 0.78
 
     # ── Step 2: Flow Reconstruction ──────────────────────────────────────
     settlement_days = 0
@@ -106,10 +128,12 @@ def analyze_payment(
         "total_leakage": round(leakage, 2),
         "leakage_pct": round(leakage_pct, 2),
         "reconstructed_flow": flow,
-        "confidence_score": 0.78,
+        "confidence_score": confidence,
         "explanation": explanation,
         "analysis_duration_ms": duration_ms,
         "recommendations": recommendations,
+        "data_source": data_source,
+        "fx_rate_source": "live" if live_mid_rate else "hardcoded",
     }
 
 

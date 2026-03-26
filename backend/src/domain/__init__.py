@@ -1,1 +1,1 @@
-# Domain layer - pure business logic
+# Domain layer — core business logic (no framework dependencies)

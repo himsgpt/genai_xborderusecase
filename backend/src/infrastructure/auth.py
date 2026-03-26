@@ -1,10 +1,11 @@
 """
-Authentication utilities — JWT + password hashing
+Authentication — JWT tokens + bcrypt password hashing.
+Infrastructure concern (not business logic).
 """
 import bcrypt
 import jwt as pyjwt
 from datetime import datetime, timedelta, timezone
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from .config import settings
@@ -14,9 +15,7 @@ security = HTTPBearer()
 
 def hash_password(password: str) -> str:
     """Hash a password using bcrypt."""
-    pwd_bytes = password.encode("utf-8")
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(pwd_bytes, salt).decode("utf-8")
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
@@ -28,6 +27,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_token(user_id: str) -> str:
+    """Create a JWT token for an authenticated user."""
     payload = {
         "sub": str(user_id),
         "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiration_hours),
@@ -37,6 +37,7 @@ def create_token(user_id: str) -> str:
 
 
 def decode_token(token: str) -> dict:
+    """Decode and validate a JWT token."""
     try:
         return pyjwt.decode(
             token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
@@ -50,7 +51,7 @@ def decode_token(token: str) -> dict:
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> str:
-    """FastAPI dependency — extract user_id from JWT Bearer token"""
+    """FastAPI dependency — extract user_id from JWT Bearer token."""
     payload = decode_token(credentials.credentials)
     user_id = payload.get("sub")
     if not user_id:
