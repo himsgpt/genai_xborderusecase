@@ -85,7 +85,7 @@ export default function Dashboard() {
     )
   }
 
-  if (error || !summary || summary.payments_analyzed === 0) {
+  if (error || !summary || (summary.total_payments_analyzed || summary.payments_analyzed || 0) === 0) {
     return (
       <div className="max-w-lg mx-auto mt-12 text-center space-y-6">
         <div className="w-16 h-16 bg-brand-50 rounded-full flex items-center justify-center mx-auto">
@@ -136,28 +136,28 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           title="Payments Analyzed"
-          value={summary.payments_analyzed}
+          value={summary.total_payments_analyzed || summary.payments_analyzed || 0}
           subtitle={`Across ${summary.corridors?.length || 0} corridors`}
           icon={DollarSign}
           color="blue"
         />
         <StatCard
           title="Total Fees Detected"
-          value={`$${summary.total_fees?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || 0}`}
-          subtitle={`${summary.avg_cost_pct?.toFixed(2) || 0}% average cost`}
+          value={`$${(summary.total_fees_usd || summary.total_fees || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
+          subtitle={`${(summary.avg_cost_pct || 0).toFixed(2)}% average cost`}
           icon={TrendingDown}
           color="yellow"
         />
         <StatCard
           title="Money Leakage"
-          value={`$${summary.total_leakage?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || 0}`}
+          value={`$${(summary.total_leakage_usd || summary.total_leakage || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
           subtitle="Above-market costs"
           icon={AlertTriangle}
           color="red"
         />
         <StatCard
           title="Annual Savings"
-          value={`$${summary.potential_annual_savings?.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || 0}`}
+          value={`$${(summary.potential_annual_savings_usd || summary.potential_annual_savings || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`}
           subtitle="Projected if optimized"
           icon={Lightbulb}
           color="green"

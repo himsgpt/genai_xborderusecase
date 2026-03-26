@@ -108,7 +108,7 @@ function AnalysisCard({ analysis }) {
               {(analysis.confidence_score * 100)?.toFixed(0)}% confidence
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-0.5 truncate">{analysis.explanation}</p>
+          <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{analysis.explanation?.split('\n')[0]}</p>
         </div>
         <div className="text-right flex-shrink-0">
           <div className="text-lg font-bold text-red-600">-${analysis.total_leakage?.toFixed(2)}</div>
@@ -144,6 +144,16 @@ function AnalysisCard({ analysis }) {
               <div className="font-bold">{analysis.analysis_duration_ms}ms</div>
             </div>
           </div>
+
+          {/* Full explanation */}
+          {analysis.explanation && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3">Full Analysis</h4>
+              <pre className="text-xs text-gray-600 bg-white border rounded-lg p-4 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+                {analysis.explanation}
+              </pre>
+            </div>
+          )}
 
           {/* Payment flow */}
           {analysis.reconstructed_flow && analysis.reconstructed_flow.length > 0 && (
