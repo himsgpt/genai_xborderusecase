@@ -75,3 +75,8 @@ logs/
 *.log
 .env
 .env.example
+
+#others#
+plan.md
+planning/
+

@@ -12,7 +12,7 @@ backend/src/
 |-- main.py                          # FastAPI app factory, lifespan, middleware, router wiring
 |-- __init__.py
 |
-|-- api/                             # API Layer -- HTTP interface
+|-- api/                             # API Layer -- ET Gen AI HackathonHTTP interface
 |   |-- __init__.py
 |   |-- schemas.py                   # Pydantic request/response models
 |   |-- deps.py                      # Shared FastAPI dependencies (get_db, get_current_user_id)
