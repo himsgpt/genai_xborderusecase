@@ -278,36 +278,10 @@ The core analysis engine (`domain/services/analysis.py`) provides:
 4. **Actionable Recommendations** -- generates specific cost-saving suggestions with annual savings estimates
 
 Demo results (8 payments, 3 corridors):
-- Total fees detected: ~$2,229
-- Money leakage: ~$959
-- Annual savings potential: ~$11,511
-- Recommendations generated: 3
+- Total fees detected: ~$xx
+- Money leakage: ~$xx
+- Annual savings potential: ~$xx
+- Recommendations generated: xyz
 
 ---
 
-## Next Steps
-
-### Done
-- [x] Live FX rates from ECB via Frankfurter API (free, no key)
-- [x] Stripe integration -- connect, sync charges, real fee_details + exchange_rate
-- [x] Analysis engine uses live rates + real Stripe fees when available
-- [x] Confidence: 78% (heuristic) -> 95% (real Stripe data)
-
-### Immediate (Week 1-2)
-1. **Test with real Stripe account** -- Use `sk_test_*` key, create test charges, sync + analyze
-2. **CSV/Excel Upload** -- Bulk import payments from bank exports (for non-Stripe sources)
-3. **LLM Agent Integration** -- Add GPT-4o-mini explanations via the `agents/` layer
-4. **More Corridors** -- Add EUR->GBP, GBP->INR, USD->MXN, etc.
-5. **Historical FX Rates** -- Use Frankfurter date-specific rates for past payments
-
-### Short-term (Week 3-4)
-6. **Multi-PSP Support** -- PayPal, Wise, Payoneer API integrations
-7. **User Dashboard Customization** -- Save preferred corridors, alert thresholds
-8. **Email Alerts** -- Notify when leakage exceeds threshold
-9. **Historical Trending** -- Track cost reduction over time
-10. **PDF Report Generation** -- Exportable analysis reports
-
-### Revenue Path
-11. **Freemium Model** -- Free: 5 payments/month. Paid: unlimited + LLM + PDF reports
-12. **API Access** -- Charge for programmatic analysis (per-payment pricing)
-13. **White-label** -- Offer the engine to fintech platforms and payment aggregators
