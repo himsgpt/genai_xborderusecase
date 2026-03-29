@@ -10,6 +10,8 @@ from ...infrastructure.auth import get_current_user_id
 from ...infrastructure.config import settings
 from ...infrastructure.fx_rates import fetch_live_rate
 from ...domain.services import analyze_payment
+from ...domain.services.corridor_data import CORRIDORS
+from ...agents.analysis_agent import enhance_single_analysis
 from ..schemas import AnalysisResponse, AnalysisSummary, CorridorSummary
 
 logger = logging.getLogger("xborder")
@@ -43,6 +45,7 @@ async def run_analysis_all(db: AsyncSession = Depends(get_db), user_id: str = De
 
     analyzed_count = 0
     recs_count = 0
+    seen_rec_titles = set()
     use_live_fx = settings.fx_rate_source == "live"
 
     for payment in payments:
@@ -71,6 +74,34 @@ async def run_analysis_all(db: AsyncSession = Depends(get_db), user_id: str = De
             logger.warning(f"Skipping payment {payment.id}: {result['error']}")
             continue
 
+        corridor_info = CORRIDORS.get(payment.corridor, {})
+        settlement_days = 0
+        if payment.settled_at and payment.initiated_at:
+            settlement_days = max(0, (payment.settled_at - payment.initiated_at).days)
+
+        llm_result = await enhance_single_analysis(
+            corridor=payment.corridor, amount_sent=payment.amount_sent,
+            currency_sent=payment.currency_sent, amount_received=payment.amount_received,
+            currency_received=payment.currency_received, mid_rate=result["mid_market_rate"],
+            actual_rate=result["actual_rate"], total_fees=result["total_fees"],
+            total_cost_pct=(result["total_fees"] / payment.amount_sent * 100) if payment.amount_sent else 0,
+            platform_fee=result["platform_fee"], intermediary_fee=result["intermediary_fee"],
+            fx_spread_cost=result["fx_spread_cost"], leakage=result["total_leakage"],
+            leakage_pct=result["leakage_pct"], psp=payment.psp,
+            settlement_days=settlement_days, flow=result["reconstructed_flow"],
+            data_source=result.get("data_source", "heuristic"), corridor_info=corridor_info,
+        )
+
+        explanation = result["explanation"]
+        recs_to_use = result.get("recommendations", [])
+        if llm_result:
+            if llm_result.get("explanation"):
+                explanation = llm_result["explanation"]
+            if llm_result.get("recommendations"):
+                recs_to_use = llm_result["recommendations"]
+            if llm_result.get("key_insight"):
+                explanation += f"\n\n💡 Key Insight: {llm_result['key_insight']}"
+
         analysis = AnalysisModel(
             payment_id=payment.id, user_id=user_id,
             expected_amount=result["expected_amount"], mid_market_rate=result["mid_market_rate"],
@@ -78,22 +109,30 @@ async def run_analysis_all(db: AsyncSession = Depends(get_db), user_id: str = De
             intermediary_fee=result["intermediary_fee"], fx_spread_cost=result["fx_spread_cost"],
             total_fees=result["total_fees"], total_leakage=result["total_leakage"],
             leakage_pct=result["leakage_pct"], reconstructed_flow=result["reconstructed_flow"],
-            confidence_score=result["confidence_score"], explanation=result["explanation"],
+            confidence_score=result["confidence_score"], explanation=explanation,
             analysis_duration_ms=result["analysis_duration_ms"],
         )
         db.add(analysis)
         await db.flush()
         analyzed_count += 1
 
-        for rec in result.get("recommendations", []):
-            db.add(RecommendationModel(
-                analysis_id=analysis.id, user_id=user_id,
-                title=rec["title"], description=rec["description"], category=rec["category"],
-                estimated_savings=rec["estimated_savings"], estimated_savings_annual=rec["estimated_savings_annual"],
-                effort=rec["effort"], risk=rec["risk"], implementation_steps=rec["implementation_steps"],
-                status="pending",
-            ))
-            recs_count += 1
+        for rec in recs_to_use:
+            title = rec.get("title", "Recommendation")
+            if title not in seen_rec_titles:
+                db.add(RecommendationModel(
+                    analysis_id=analysis.id, user_id=user_id,
+                    title=title,
+                    description=rec.get("description", ""),
+                    category=rec.get("category", "general"),
+                    estimated_savings=rec.get("estimated_savings", 0),
+                    estimated_savings_annual=rec.get("estimated_savings_annual", 0),
+                    effort=rec.get("effort", "medium"),
+                    risk=rec.get("risk", "low"),
+                    implementation_steps=rec.get("implementation_steps", []),
+                    status="pending",
+                ))
+                seen_rec_titles.add(title)
+                recs_count += 1
 
     await db.commit()
 

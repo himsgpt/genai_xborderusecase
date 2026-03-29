@@ -22,11 +22,12 @@ class Settings(BaseSettings):
     environment: Literal["development", "production"] = "development"
 
     # LLM (optional — product works without it, LLM enhances explanations)
-    llm_provider: Literal["none", "openai", "groq", "ollama"] = "none"
+    # Auto-detected from keys if set to "auto"
+    llm_provider: Literal["auto", "none", "openai", "groq", "ollama"] = "auto"
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4o-mini"
     groq_api_key: Optional[str] = None
-    groq_model: str = "llama-3.1-70b-versatile"
+    groq_model: str = "llama-3.1-8b-instant"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "llama3.1:8b"
 
